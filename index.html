@@ -156,7 +156,7 @@
   <span class="add-icon">+</span><span>添加活动</span>
 </div>
 
-<!-- 底部工具栏（含同步按钮） -->
+<!-- 底部工具栏）-->
 <div class="toolbar">
   <div class="toolbar-item" onclick="toggleLayout()" ontouchstart="toggleLayout()"><span>⬛</span><span>布局</span></div>
   <div class="toolbar-item" onclick="testRemind()"><span>⏰</span><span>提醒</span></div>
@@ -164,7 +164,6 @@
   <div class="toolbar-item" onclick="search()"><span>🔍</span><span>搜索</span></div>
   <div class="toolbar-item" onclick="exportData()"><span>📤</span><span>导出</span></div>
   <div class="toolbar-item" onclick="importData()"><span>📥</span><span>导入</span></div>
-  <div class="toolbar-item" onclick="showFetchModal()"><span>📡</span><span>同步</span></div>
 </div>
 
 <!-- 编辑弹窗 -->
@@ -234,98 +233,7 @@ let isEdit = false;
 let isPasswordVerified = false;
 let lastSearchKeyword = "";
 
-// ========== 核心：9款游戏API配置（含重返未来，格式统一无报错） ==========
-const GAME_EVENT_APIS = {
-  genshin: { url: "https://api.vvhan.com/api/ys/event", name: "原神", backup: "https://api.ihcr.top/ys/event" },
-  starrail: { url: "https://api.vvhan.com/api/sr/event", name: "星穹铁道", backup: "https://api.ihcr.top/sr/event" },
-  mingchao: { url: "https://api.ihcr.top/mc/event", name: "鸣潮", backup: "https://api.vvhan.com/api/mc/event" },
-  juequ: { url: "https://api.ihcr.top/jq/event", name: "绝区零", backup: "https://api.ddoa.cn/jq/event" },
-  warmth: { url: "https://api.istero.com/resource/v1/nikki/event", name: "无限暖暖", backup: "https://api.vvhan.com/api/nikki/event" },
-  Arknigs: { url: "https://api.ihcr.top/arknights/event", name: "明日方舟", backup: "https://api.ddoa.cn/arknights/event" },
-  "Arknigs：Endfield": { url: "https://end.shallow.ink/api/event/public", name: "明日方舟：终末地", backup: "https://api.ihcr.top/endfield/event" },
-  reverse: { url: "https://api.ihcr.top/reverse/event", name: "重返未来", backup: "https://api.ddoa.cn/reverse/event" } // 重返未来API（格式统一）
-};
-
-// 格式化日期为YYYY-MM-DD
-function formatApiDate(dateStr) {
-  if (!dateStr) return new Date().toISOString().split('T')[0];
-  const date = new Date(dateStr);
-  return date.toISOString().split('T')[0];
-}
-
-// 抓取指定游戏的官方活动（修复逻辑，避免阻塞）
-async function fetchGameEvents(gameType) {
-  try {
-    const config = GAME_EVENT_APIS[gameType];
-    if (!config) {
-      alert("暂不支持该游戏的自动同步！");
-      return;
-    }
-
-    alert(`正在同步${config.name}官方活动，请稍候...`);
-    let response, data;
-    // 尝试主用API，失败则用备用
-    try {
-      response = await fetch(config.url);
-      data = await response.json();
-      if (!data.success && !Array.isArray(data)) throw new Error("主用API返回异常");
-    } catch (mainErr) {
-      console.log(`主用API失效，切换备用：${config.backup}`);
-      response = await fetch(config.backup);
-      data = await response.json();
-    }
-
-    // 适配数据格式
-    let apiEvents = [];
-    if (data.success && data.data) apiEvents = data.data;
-    else if (Array.isArray(data)) apiEvents = data;
-
-    if (!apiEvents.length) {
-      alert(`暂无${config.name}最新活动！`);
-      return;
-    }
-
-    // 转换+去重
-    const newEvents = apiEvents
-      .filter(item => item.title || item.name)
-      .map(item => ({
-        id: Date.now() + Math.floor(Math.random() * 1000),
-        name: item.title || item.name,
-        game: gameType,
-        start: formatApiDate(item.startTime || item.start || item.beginTime),
-        end: formatApiDate(item.endTime || item.end || item.finishTime),
-        remind: 1
-      }))
-      .filter(newEvent => !list.some(oldEvent => oldEvent.name === newEvent.name && oldEvent.game === newEvent.game));
-
-    if (newEvents.length === 0) {
-      alert(`本地已包含${config.name}所有最新活动！`);
-      return;
-    }
-
-    list = [...list, ...newEvents];
-    saveData();
-    render();
-    alert(`✅ 同步成功！新增${newEvents.length}条${config.name}活动`);
-  } catch (e) {
-    console.error("同步失败：", e);
-    alert(`❌ 同步失败：${e.message}`);
-  }
-}
-
-// 游戏选择弹窗（含重返未来）
-function showFetchModal() {
-  const gameType = prompt(
-    "请选择要同步的游戏（输入关键词）：\n" +
-    "1. genshin（原神）\n2. starrail（星穹铁道）\n3. mingchao（鸣潮）\n" +
-    "4. juequ（绝区零）\n5. warmth（无限暖暖）\n6. Arknigs（明日方舟）\n" +
-    "7. Arknigs：Endfield（终末地）\n8. reverse（重返未来）",
-    "genshin"
-  );
-  if (gameType) fetchGameEvents(gameType.trim());
-}
-
-// ========== 密码弹窗逻辑（修复阻塞问题） ==========
+// ========== 密码弹窗逻辑 ==========
 function showPasswordModal() {
   document.getElementById("passwordModal").style.display = "flex";
   const inputEl = document.getElementById("passwordInput");
@@ -345,41 +253,31 @@ function handlePasswordCancel() {
 }
 
 function handlePasswordConfirm() {
-  try {
-    const inputEl = document.getElementById("passwordInput");
-    const errorEl = document.getElementById("passwordError");
-    const inputPwd = inputEl.value.trim();
+  const inputEl = document.getElementById("passwordInput");
+  const errorEl = document.getElementById("passwordError");
+  const inputPwd = inputEl.value.trim();
 
-    if (!inputPwd) {
-      errorEl.textContent = "⚠️ 请输入密码后再确认！";
-      inputEl.classList.add("error");
-      inputEl.focus();
-      return;
-    }
-
-    if (inputPwd !== VERIFY_PASSWORD) {
-      errorEl.textContent = "❌ 密码错误！正确密码：1212";
-      inputEl.classList.add("error");
-      inputEl.value = "";
-      inputEl.focus();
-      return;
-    }
-
-    // 密码正确，无阻塞执行后续逻辑
-    isPasswordVerified = true;
-    hidePasswordModal();
-    loadData();
-    render();
-    // 可选：自动同步原神活动
-    setTimeout(() => {
-      fetchGameEvents("genshin");
-    }, 2000);
-  } catch (e) {
-    console.error("密码验证失败：", e);
-    alert("❌ 验证异常，请刷新页面重试！");
+  if (!inputPwd) {
+    errorEl.textContent = "⚠️ 请输入密码后再确认！";
+    inputEl.classList.add("error");
+    inputEl.focus();
+    return;
   }
-}
 
+  if (inputPwd !== VERIFY_PASSWORD) {
+    errorEl.textContent = "❌ 密码错误！正确密码：1212";
+    inputEl.classList.add("error");
+    inputEl.value = "";
+    inputEl.focus();
+    return;
+  }
+
+  // 密码验证成功：立即加载数据并渲染
+  isPasswordVerified = true;
+  hidePasswordModal();
+  loadData(); // 核心：验证成功后立即加载
+  render();   // 核心：强制立即渲染
+}    
 // ========== 数据存储逻辑 ==========
 function loadData() {
   try {
